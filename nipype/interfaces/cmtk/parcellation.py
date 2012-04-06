@@ -18,9 +18,8 @@ import networkx as nx
 import shutil
 from nipype.utils.misc import package_check
 import warnings
-import logging
 
-logging.basicConfig()
+from ... import logging
 iflogger = logging.getLogger('interface')
 
 have_cmp = True
@@ -351,9 +350,10 @@ def crop_and_move_datasets(subject_id, subjects_dir, fs_dir, parcellation_name, 
         mri_cmd = 'mri_convert -rl "%s" -rt nearest "%s" -nc "%s"' % (orig, d[0], d[1])
         runCmd( mri_cmd,log )
 
+
 class ParcellateInputSpec(BaseInterfaceInputSpec):
     subject_id = traits.String(mandatory=True, desc='Subject ID')
-    parcellation_name = traits.Enum('scale500', ['scale33', 'scale60', 'scale125', 'scale250','scale500'], usedefault=True)
+    parcellation_name = traits.Enum('scale500', ['scale33', 'scale60', 'scale125', 'scale250', 'scale500'], usedefault=True)
     freesurfer_dir = Directory(exists=True, desc='Freesurfer main directory')
     subjects_dir = Directory(exists=True, desc='Freesurfer subjects directory')
     out_roi_file = File(genfile = True, desc='Region of Interest file for connectivity mapping')
