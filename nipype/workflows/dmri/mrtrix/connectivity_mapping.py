@@ -294,26 +294,31 @@ def create_connectivity_pipeline(name="connectivity", parcellation_name='scale50
 
     phrases = ['frontalpole']
     # Both hemispheres
-    phrases.append('lateraloccipital_1')
-    phrases.append('lateraloccipital_10')
-    phrases.append('lateraloccipital_12')
-    phrases.append('lateraloccipital_20')
+    phrases.append('rh.lateraloccipital_12')
+    phrases.append('lh.lateraloccipital_12')
+    phrases.append('rh.lateraloccipital_10')
+    phrases.append('lh.lateraloccipital_10')
+    phrases.append('rh.lateraloccipital_20')
+    phrases.append('lh.lateraloccipital_20')
 
     # Left
-    phrases.append('lateraloccipital_2')
-    phrases.append('lateraloccipital_4')
-    phrases.append('lateraloccipital_6')
-    phrases.append('lateraloccipital_7')
-    phrases.append('lateraloccipital_11')    
-    phrases.append('lateraloccipital_15')
+    phrases.append('lh.lateraloccipital_2')
+    phrases.append('lh.lateraloccipital_4')
+    phrases.append('lh.lateraloccipital_6')
+    phrases.append('lh.lateraloccipital_7')
+    phrases.append('lh.lateraloccipital_11')    
+    phrases.append('lh.lateraloccipital_15')
 
     # Right
-    phrases.append('lateraloccipital_9')
-    phrases.append('lateraloccipital_13')
-    phrases.append('lateraloccipital_14')
-    phrases.append('lateraloccipital_16')
-    phrases.append('lateraloccipital_19')
-    phrases.append('lateraloccipital_21')
+    phrases.append('rh.lateraloccipital_9')
+    phrases.append('rh.lateraloccipital_13')
+    phrases.append('rh.lateraloccipital_14')
+    phrases.append('rh.lateraloccipital_16')
+    phrases.append('rh.lateraloccipital_19')
+    phrases.append('rh.lateraloccipital_21')
+    
+    phrases.append('rh.lateraloccipital_1')
+    phrases.append('lh.lateraloccipital_1')
 
     node_removal = pe.Node(interface=cv.RemoveNodesByPhrase(), name="node_removal")
     node_removal.inputs.phrases = phrases

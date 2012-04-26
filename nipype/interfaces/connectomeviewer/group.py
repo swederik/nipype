@@ -111,17 +111,27 @@ class RemoveUnconnectedNodes(BaseInterface):
 		return name + '.' + ext
 
 
-def remove_nodes_named(in_file, phrase='occipital', out_file='removed.pck'):
+def remove_nodes_named(in_file, phrase='occipital', exact=False, out_file='removed.pck'):
     in_ntwk = nx.read_gpickle(in_file)
     out_ntwk = in_ntwk.copy()
     nodes = in_ntwk.nodes_iter()
     count = 0
     for node in nodes:
         node_name = str(in_ntwk.node[node]['dn_name'])
-        if node_name.rfind(phrase) >= 0:
-            iflogger.info(node_name)
-            count += 1
-            out_ntwk.remove_node(node)
+        if exact
+			if node_name == phrase:
+				iflogger.info(node_name)
+				count += 1
+				out_ntwk.remove_node(node)
+        else:
+			if node_name == phrase:
+				iflogger.info(node_name)
+				count += 1
+				out_ntwk.remove_node(node)				
+			elif node_name.rfind(phrase) >= 0:
+				iflogger.info(node_name)
+				count += 1
+				out_ntwk.remove_node(node)
     iflogger.info('{N} nodes removed with "{n}" in their name'.format(N=count, n=phrase))
     mapping=dict(zip(out_ntwk.nodes(),range(1,out_ntwk.number_of_nodes()+1)))
     out_ntwk=nx.relabel_nodes(out_ntwk,mapping)
@@ -132,6 +142,7 @@ def remove_nodes_named(in_file, phrase='occipital', out_file='removed.pck'):
 class RemoveNodesByPhraseInputSpec(BaseInterfaceInputSpec):
     in_files = InputMultiPath(File(exists=True), mandatory=True, desc='Networks for node removal subjects')
     phrases = traits.List(['occipital'], usedefault=True, desc='Network node names to remove from the network')
+    exact = traits.Bool(False, usedefault=True, desc='Nodes to remove must exactly match the input phrase')
     output_as_cff = traits.Bool(True, usedefault=True, desc='Option to save the output networks in a Connectome File Format (CFF) file')
     output_cff_file = File('removed.cff', usedefault=True, desc='The output networks saved in a single CFF file')
 
@@ -162,9 +173,9 @@ class RemoveNodesByPhrase(BaseInterface):
             for in_file in self.inputs.in_files:
                 if idx == 0:
                     out_path = get_out_paths(in_file)
-                    remove_nodes_named(in_file, phrase, out_path)
+                    remove_nodes_named(in_file, phrase, self.inputs.exact, out_path)
                 else:
-                    remove_nodes_named(out_path, phrase, out_path)
+                    remove_nodes_named(out_path, phrase, self.inputs.exact, out_path)
                 out_paths.append(out_path)
                         
         if self.inputs.output_as_cff:
