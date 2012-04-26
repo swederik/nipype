@@ -110,6 +110,8 @@ def create_group_connectivity_pipeline(group_list, group_id, data_dir, subjects_
                                               ("outputnode.rois", "@l1output.rois"),
                                               ("outputnode.odfs", "@l1output.odfs"),
                                               ("outputnode.struct", "@l1output.struct"),
+                                              ("outputnode.tdi", "@l1output.tdi"),
+                                              ("outputnode.tracks2prob", "@l1output.tracks2prob"),
                                               ("outputnode.networks", "@l1output.networks"),
                                               ("outputnode.mean_fiber_length", "@l1output.mean_fiber_length"),
                                               ("outputnode.fiber_length_std", "@l1output.fiber_length_std"),
