@@ -118,7 +118,7 @@ def remove_nodes_named(in_file, phrase='occipital', exact=False, out_file='remov
     count = 0
     for node in nodes:
         node_name = str(in_ntwk.node[node]['dn_name'])
-        if exact
+        if exact:
 			if node_name == phrase:
 				iflogger.info(node_name)
 				count += 1
