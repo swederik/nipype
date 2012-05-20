@@ -1004,3 +1004,91 @@ class NetworkBasedROIFiltering(BaseInterface):
 		filtered_roi_name = op.abspath(name + '.nii.gz')
 		outputs['filtered_roi_file'] = filtered_roi_name
 		return outputs
+
+def node_names_from_list(in_list, in_ntwk, key = 'dn_name'):
+    out_names = []
+    for idx, unconnected in enumerate(in_list):
+        if unconnected:
+            out_names.append(in_ntwk.node[idx][key])
+    return out_names
+
+def prune_stats_by_ntwk(in_file, in_ntwk, unconnected_name_list, out_stats_name, invert=False):
+    from nipype.utils.filemanip import split_filename
+    stats_file = open(in_file, 'r')
+    out_stats_file = open(out_stats_name, 'w')
+    header_line = stats_file.readline()
+    out_stats_file.write(header_line)
+    for line in stats_file:
+        line_list = line.split(',')
+        line_node = line_list[0].replace('"','')
+        if invert:
+            if line_node in unconnected_name_list:
+                out_stats_file.write(line)
+        else:
+            if not line_node in unconnected_name_list:
+                out_stats_file.write(line)
+    out_stats_file.close()
+    return out_stats_file
+ 
+class NetworkBasedStatsFilteringInputSpec(TraitedSpec):
+    stats_file = File(exists=True, mandatory=True, desc='Nodal statistics comma-separated value (CSV) file')
+    network_file = File(exists=True, mandatory=True, desc="Subject's connectivity graph")
+    above_threshold = traits.Bool(False, usedefault=True, desc='Only connectivity values greater than or equal to the threshold will be used')
+    weight_threshold = traits.Float(0.05, usedefault=True, desc='Connectivity weight threshold (default 0.05, for NBS graph analysis)')
+    invert_selection = traits.Bool(False, usedefault=True, desc='This option is useful for examining the nodes that are excluded from your filtering. With invert_selection on, only the complement of your selection criteria will remain.')
+    edge_key = traits.Str('weight', usedefault=True, desc='Connectivity edge key to threshold')
+    out_filtered_stats_file = File('connected.csv', usedefault=True, desc='Name for output filtered stats file')
+
+class NetworkBasedStatsFilteringOutputSpec(TraitedSpec):
+    filtered_stats_file = File(desc='Region-of-interest file containing only those regions which have supra(sub)-threshold edges', exists=True)
+
+class NetworkBasedStatsFiltering(BaseInterface):
+    """
+    Given a nodal statistics file and a connectivity graph, this 
+    interface will remove all nodal statistics with edges below/above the
+    user-specified threshold.
+
+    Example
+    -------
+
+    >>> import nipype.interfaces.cmtk as cmtk
+    >>> filtstats = cmtk.NetworkBasedStatsFiltering()
+    >>> filtstats.inputs.stats_file = 'nodal.csv'
+    >>> filtstats.inputs.network_file = 'fsLUT_aparc+aseg.pck'
+    >>> filtstats.run()                 # doctest: +SKIP
+    """
+
+    input_spec = NetworkBasedStatsFilteringInputSpec
+    output_spec = NetworkBasedStatsFilteringOutputSpec
+
+    def _run_interface(self, runtime):
+        iflogger.info('Reading Network file {ntwk}'.format(ntwk=self.inputs.network_file))
+        path, name, ext = split_filename(self.inputs.network_file)
+        if ext == '.pck':
+            ntwk = nx.read_gpickle(self.inputs.network_file)
+        elif ext == '.graphml':
+            ntwk = nx.read_graphml(self.inputs.network_file)
+        
+        key = 'dn_name'
+        connectivity_matrix = np.array(nx.to_numpy_matrix(ntwk, weight=self.inputs.edge_key))
+        adjacency_matrix = adjacency_matrix_from_cmat(connectivity_matrix, self.inputs.weight_threshold, self.inputs.above_threshold)
+        unconnected_list = unconnected_list_from_adjmat(adjacency_matrix)
+        unconnected_name_list = node_names_from_list(unconnected_list, ntwk, key)
+
+        _, name, ext = split_filename(self.inputs.out_filtered_stats_file)
+        if not ext == '.csv':
+            ext = '.csv'
+        filtered_stats_file = op.abspath(name + ext)
+        iflogger.info('Input stats file {s}'.format(s=self.inputs.stats_file))
+        out_stats_file = prune_stats_by_ntwk(self.inputs.stats_file, self.inputs.network_file, unconnected_name_list, filtered_stats_file, invert=self.inputs.invert_selection)
+        iflogger.info('Saving filtered stats file to {path}'.format(path=filtered_stats_file))
+        return runtime
+
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        _, name, ext = split_filename(self.inputs.out_filtered_stats_file)
+        if not ext == '.csv':
+            ext = '.csv'
+        filtered_stats_file = op.abspath(name + ext)
+        outputs['filtered_stats_file'] = filtered_stats_file
+        return outputs
