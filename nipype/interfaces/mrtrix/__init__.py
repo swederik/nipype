@@ -12,3 +12,5 @@ from .preprocess import (MRConvert, MRMultiply, MRTrixViewer, MRTrixInfo,
                          Tensor2ApparentDiffusion, Tensor2FractionalAnisotropy,
                          Tensor2Vector, MedianFilter3D, Erode, Threshold)
 from .convert import MRTrix2TrackVis
+from .normalize import NormalizeTracks, GenerateUnitWarpField
+
