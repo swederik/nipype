@@ -1,6 +1,7 @@
 import nipype.interfaces.utility as util     # utility
 import nipype.pipeline.engine as pe          # pypeline engine
 import nipype.interfaces.fsl as fsl
+import nipype.interfaces.spm as spm
 import nipype.interfaces.mrtrix as mrtrix
 
 def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilistic'):
@@ -161,4 +162,75 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
     if tractography_type == 'probabilistic':
         workflow.connect([(tracks2prob, outputnode, [("tract_image", "tdi")])])
 
+    return workflow
+
+
+def create_track_normalization_pipeline(name="normtracks"):
+    """Creates a pipeline to normalize a set of tracks from a subject's
+    diffusion space into a user-specified template space.
+
+    Example
+    -------
+
+    >>> norm = create_track_normalization_pipeline("normtracks")
+    >>> norm.inputs.inputnode.tracks = 'tracks.tck'
+    >>> norm.inputs.inputnode.fa = 'fa.nii'
+    >>> norm.inputs.inputnode.structural = 'struct.nii'
+    >>> norm.inputs.inputnode.template = 't1.nii'
+    >>> norm.run()                  # doctest: +SKIP
+
+    Inputs::
+
+        inputnode.tracks
+        inputnode.fa
+        inputnode.structural
+        inputnode.template
+
+    Outputs::
+
+        outputnode.normalized_tracks
+
+    """
+
+    inputnode = pe.Node(interface = util.IdentityInterface(fields=["tracks",
+                                                                   "fa",
+                                                                   "structural",
+                                                                   "template"]),
+                        name="inputnode")
+
+    def pull_prefix(in_files):
+        from nipype.utils.filemanip import split_filename
+        path, name, ext = split_filename(in_files[0])
+        remove_last_digit = name[0:-2]
+        return remove_last_digit
+
+    gen_unit_warp = pe.Node(interface=mrtrix.GenerateUnitWarpField(), name='gen_unit_warp')
+
+    norm_tracks = pe.Node(interface=mrtrix.NormalizeTracks(), name='norm_tracks')
+
+    normalize_T1 = pe.Node(interface=spm.Normalize(), name='normalize_T1')
+
+    apply_deform = pe.Node(interface=spm.ApplyDeformations(), name='apply_deform')
+    apply_deform.inputs.interp = 1
+
+    workflow = pe.Workflow(name=name)
+    workflow.base_output_dir=name
+
+    workflow.connect([(inputnode, norm_tracks,[("tracks","in_file")])])
+    workflow.connect([(inputnode, normalize_T1,[("template","template")])])
+    workflow.connect([(inputnode, normalize_T1,[("structural","source")])])
+    workflow.connect([(inputnode, gen_unit_warp,[("template","in_file")])])
+    workflow.connect([(inputnode, apply_deform,[("fa","inverse_volume")])])
+    workflow.connect([(normalize_T1, apply_deform,[('normalization_parameters', 'inverse_sn2def_matname')])])
+    workflow.connect([(gen_unit_warp, apply_deform,[('out_files', 'in_files')])])
+    workflow.connect([(apply_deform, norm_tracks,[('out_files', 'transform_images')])])
+    workflow.connect([(apply_deform, norm_tracks, [(('out_files', pull_prefix), 'transform_image_prefix')])])
+
+    output_fields = ["normalized_tracks"]
+
+    outputnode = pe.Node(interface = util.IdentityInterface(fields=output_fields),
+                                        name="outputnode")
+    
+    workflow.connect([(norm_tracks, outputnode, [("out_file", "normalized_tracks")])])
+    
     return workflow
