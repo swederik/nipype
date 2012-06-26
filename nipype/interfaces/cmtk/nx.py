@@ -738,3 +738,61 @@ class DifferenceGraph(BaseInterface):
 
     def _gen_outfilename(self, name, ext):
         return name + '.' + ext
+
+
+
+def ntwk_to_nifti_image(in_file, weight_key='value'):
+	import numpy as np
+	import nibabel as nb
+	import networkx as nx
+	import os, os.path as op
+	from nipype.utils.filemanip import split_filename	
+	path, name, ext = split_filename(in_file)
+	out_file = op.abspath(name + '.nii')
+	try:
+		ntwk = nx.read_graphml(in_file)
+	except:
+		ntwk = nx.read_gpickle(in_file)
+		
+	edge_array = np.asarray(nx.to_numpy_matrix(ntwk))
+	header = nb.Nifti1Header()
+	affine = np.eye(4)
+	out_image = nb.Nifti1Image(data=edge_array, affine=affine, header=header)
+	nb.save(out_image, out_file)
+	return out_file
+
+
+class Network2NiftiImageInputSpec(BaseInterfaceInputSpec):
+    in_file = File(exists=True, mandatory=True, desc='Network to be converted')
+    weight_key = traits.Str('value', usedefault=True, desc='The edge key for the connectivity values (default: "value")')
+    out_file = File(desc='Difference network saved as a .mat file')
+
+class Network2NiftiImageOutputSpec(TraitedSpec):
+    out_file = File(desc="Nifti image for the input network's connectivity matrix")
+
+class Network2NiftiImage(BaseInterface):
+	"""
+	Converts a NetworkX graph in either gpickle or gexf format to a Nifti image
+
+	Example
+	-------
+
+	>>> import nipype.interfaces.cmtk as cmtk
+	>>> ntwk2nii = cmtk.Network2NiftiImage()
+	>>> ntwk2nii.inputs.in_file = 'subj1.pck'
+	>>> ntwk2nii.run()                 # doctest: +SKIP
+
+	"""
+	input_spec = Network2NiftiImageInputSpec
+	output_spec = Network2NiftiImageOutputSpec
+
+	def _run_interface(self, runtime):
+		network_name = ntwk_to_nifti_image(self.inputs.in_file, self.inputs.weight_key)
+		iflogger.info('Saving connectivity matrix to {path} as a Nifti image'.format(path=op.abspath(network_name)))
+		return runtime
+
+	def _list_outputs(self):
+		outputs = self.output_spec().get()
+		path, name, ext = split_filename(self.inputs.in_file)
+		outputs["out_file"] = op.abspath(name + '.nii')
+		return outputs
