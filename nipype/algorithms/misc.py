@@ -901,3 +901,63 @@ class AddCSVColumn(BaseInterface):
         out_file = op.abspath(name + ext)
         outputs['csv_file'] = out_file
         return outputs
+
+def nifti_to_tiff_stack(in_file):
+    import nibabel as nb
+    import numpy as np
+    import os, os.path as op
+    import Image
+    from nipype.utils.filemanip import split_filename
+    in_image = nb.load(in_file)
+    data = in_image.get_data()
+    rng = np.shape(data)[0]
+    randnum = int(np.random.random(1)*10000)
+    out_list = []
+    for x in range(0,rng):
+        twoDarray = np.transpose(data[x,:,:])
+        twoD = Image.fromarray(np.uint8(twoDarray))
+        out_name = '{r}_output_{i}.tiff'.format(r=randnum, i=x+10000)
+        twoD.save(out_name, 'TIFF')
+        out_list.append(out_name)
+    in_list_as_str = ' '.join(out_list)
+    path, name, ext = split_filename(in_file)
+    out_file = op.abspath(name + '.tif')
+    cmd = 'tiffcp {i} {o}'.format(i=in_list_as_str, o=out_file)
+    os.system(cmd)
+    clean_cmd = 'rm {n}_output*'.format(n=randnum)
+    os.system(clean_cmd)
+    return out_file
+
+class Nifti2TiffStackInputSpec(BaseInterfaceInputSpec):
+    in_file = File(exists=True, mandatory=True, desc='Network to be converted')
+    out_file = File(desc='Difference network saved as a .mat file')
+
+class Nifti2TiffStackOutputSpec(TraitedSpec):
+    out_file = File(desc="Nifti image for the input network's connectivity matrix")
+
+class Nifti2TiffStack(BaseInterface):
+	"""
+	Converts a Nifti image to a TIFF stack
+
+	Example
+	-------
+
+	>>> import nipype.algorithms.misc as misc
+	>>> nii2tiff = misc.Nifti2TiffStack()
+	>>> nii2tiff.inputs.in_file = 'struct.nii'
+	>>> nii2tiff.run()                 # doctest: +SKIP
+
+	"""
+	input_spec = Nifti2TiffStackInputSpec
+	output_spec = Nifti2TiffStackOutputSpec
+
+	def _run_interface(self, runtime):
+		tiff_name = nifti_to_tiff_stack(self.inputs.in_file)
+		iflogger.info('Saving Nifti image to {path} as a TIFF stack'.format(path=op.abspath(tiff_name)))
+		return runtime
+
+	def _list_outputs(self):
+		outputs = self.output_spec().get()
+		path, name, ext = split_filename(self.inputs.in_file)
+		outputs["out_file"] = op.abspath(name + '.tif')
+		return outputs
