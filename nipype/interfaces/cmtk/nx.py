@@ -796,3 +796,226 @@ class Network2NiftiImage(BaseInterface):
 		path, name, ext = split_filename(self.inputs.in_file)
 		outputs["out_file"] = op.abspath(name + '.nii')
 		return outputs
+
+
+def common_edges(in_file, filter_file, ntwk_res_file):
+	"""
+	Filters the edges of in_file using the edges of filter_file and keeps the node positions of ntwk_res_file.
+
+	"""
+	import networkx as nx
+	import os.path as op
+	from nipype.utils.filemanip import split_filename
+	iflogger.info("Creating common edge network: {in_f} with edges in {f}".format(in_f=in_file, f=filter_file))
+
+	_, name, _ = split_filename(in_file)
+	_, filter_name, _ = split_filename(filter_file)
+	ntwk = nx.read_gpickle(in_file)
+	iflogger.info('File {s} has {n} edges'.format(s=name, n=ntwk.number_of_edges()))
+	filter_ntwk = nx.read_gpickle(filter_file)
+	iflogger.info('File {s} has {n} edges'.format(s=filter_name, n=filter_ntwk.number_of_edges()))
+
+	ntwk_res_file = nx.read_gpickle(ntwk_res_file)
+	iflogger.info("{n} Nodes found in network resolution file".format(n=ntwk_res_file.number_of_nodes()))
+
+	common_ntwk = ntwk_res_file.copy()
+	common_ntwk = remove_all_edges(common_ntwk)
+	edges1 = ntwk.edges_iter()
+	filter_edges = filter_ntwk.edges_iter()
+	for edge in filter_edges:
+		# Retain only edges in both networks and calculate the difference for each key at those edges
+		if ntwk.has_edge(edge[0], edge[1]):
+			dict_in = ntwk.edge[edge[0]][edge[1]]
+			common_ntwk.add_edge(edge[0], edge[1], dict_in)
+
+	# Writes the networks and returns the name
+	network_name = str(name) + '-edges_filtered_by-' + str(filter_name)
+
+	nx.write_gpickle(common_ntwk, op.abspath(network_name + '.pck'))
+	iflogger.info('Saving common edge graph as {out}'.format(out=op.abspath(network_name + '.pck')))
+	common_ntwk = fix_keys_for_gexf(common_ntwk)
+
+	nx.write_gexf(common_ntwk, op.abspath(network_name + '.gexf'))
+	iflogger.info('Saving common edge graph as {out}'.format(out=op.abspath(network_name + '.gexf')))
+	common_array = nx.to_numpy_matrix(common_ntwk)
+	common_array = np.array(common_array)
+	common_dict = {}
+	common_dict[network_name] = common_array
+	sio.savemat(op.abspath(network_name + '.mat'), common_dict)
+	iflogger.info('Saving common edge graph as {out}'.format(out=op.abspath(network_name + '.mat')))
+	return network_name
+
+class CommonEdgesInputSpec(BaseInterfaceInputSpec):
+    in_file = File(exists=True, mandatory=True, desc='Network to filter')
+    filter_file = File(exists=True, mandatory=True, desc='Only edges in this network, with weights from in_file, will be returned')
+    resolution_network_file = File(exists=True, desc='A network which defines where to place the nodes for the filtered graph' \
+                                'If this is not provided, the interface will take node positions from in_file.')
+    out_gpickled_common_edges = File(desc='Filtered network saved as a NetworkX .pck')
+    out_gexf_common_edges = File(desc='Filtered network saved as a .gexf file')
+    out_matlab_common_edges = File(desc='Filtered network saved as a .mat file')
+
+class CommonEdgesOutputSpec(TraitedSpec):
+    gpickled_common_edges = File(desc='Difference network saved as a NetworkX .pck')
+    gexf_common_edges = File(desc='Difference network saved as a .gexf file')
+    matlab_common_edges = File(desc='Difference network saved as a MATLAB .mat file')
+
+class CommonEdges(BaseInterface):
+	"""
+	Filters a graph's edges using another graph given two input NetworkX gpickle files
+
+	Node positions and data can be input using a network resolution file. If one is not specified, they 
+	will be pulled from in_file2.
+
+	Example
+	-------
+
+	>>> import nipype.interfaces.cmtk as cmtk
+	>>> diff = cmtk.CommonEdges()
+	>>> diff.inputs.in_file = 'subj1.pck'
+	>>> diff.inputs.filter_file = 'subj2.pck'
+	>>> diff.run()                 # doctest: +SKIP
+
+	"""
+	input_spec = CommonEdgesInputSpec
+	output_spec = CommonEdgesOutputSpec
+
+	def _run_interface(self, runtime):
+		if isdefined(self.inputs.resolution_network_file):
+			ntwk_res_file = self.inputs.resolution_network_file
+		else:
+			ntwk_res_file = self.inputs.in_file
+		
+		network_name = common_edges(self.inputs.in_file, self.inputs.filter_file, ntwk_res_file)
+		return runtime
+
+	def _list_outputs(self):
+		outputs = self.output_spec().get()
+		_, name, _  = split_filename(self.inputs.in_file)
+		_, filter_name, _  = split_filename(self.inputs.filter_file)
+
+		name = str(name) + '-edges_filtered_by-' + str(filter_name)
+		
+		if not isdefined(self.inputs.out_gpickled_common_edges):
+			outputs["gpickled_common_edges"] = op.abspath(self._gen_outfilename('common_' + name, 'pck'))
+		else:
+			outputs["gpickled_common_edges"] = op.abspath(self.inputs.out_gpickled_common_edges)
+
+		if not isdefined(self.inputs.out_gexf_common_edges):
+			outputs["gexf_common_edges"] = op.abspath(self._gen_outfilename('common_' + name, 'gexf'))
+		else:
+			outputs["gexf_common_edges"] = op.abspath(self.inputs.out_gexf_common_edges)
+
+		if not isdefined(self.inputs.out_matlab_common_edges):
+			outputs["matlab_common_edges"] = op.abspath(self._gen_outfilename('common_' + name, 'mat'))
+		else:
+			outputs["matlab_common_edges"] = op.abspath(self.inputs.out_matlab_common_edges)
+			
+		return outputs
+
+	def _gen_outfilename(self, name, ext):
+		return name + '.' + ext
+		
+		
+def threshold_edges(in_file, edge_key, threshold=0.05, above=False):
+	"""
+	Filters the edges of in_file using the edges of filter_file and keeps the node positions of ntwk_res_file.
+
+	"""
+	import networkx as nx
+	import os.path as op
+	from nipype.utils.filemanip import split_filename
+	iflogger.info("Thresholding edges in network: {in_f} with threshold {t}".format(in_f=in_file, t=threshold))
+
+	_, name, _ = split_filename(in_file)
+	ntwk = nx.read_gpickle(in_file)
+	iflogger.info('File {s} has {n} edges'.format(s=name, n=ntwk.number_of_edges()))
+
+	thresholded_ntwk = ntwk.copy()
+	thresholded_ntwk = remove_all_edges(thresholded_ntwk)
+	edges1 = ntwk.edges_iter()
+	for edge in edges1:
+		# Retain only edges that are above or below the threshold
+		value = ntwk.edge[edge[0]][edge[1]][edge_key]
+		if above and value > threshold:
+			dict_in = ntwk.edge[edge[0]][edge[1]]
+			thresholded_ntwk.add_edge(edge[0], edge[1], dict_in)
+		elif above == False and value <= threshold:
+			dict_in = ntwk.edge[edge[0]][edge[1]]
+			thresholded_ntwk.add_edge(edge[0], edge[1], dict_in)
+
+	# Writes the networks and returns the name
+	network_name = str(name) + '-thresholded'
+
+	nx.write_gpickle(thresholded_ntwk, op.abspath(network_name + '.pck'))
+	iflogger.info('Saving thresholded graph as {out}'.format(out=op.abspath(network_name + '.pck')))
+	thresholded_ntwk = fix_keys_for_gexf(thresholded_ntwk)
+
+	nx.write_gexf(thresholded_ntwk, op.abspath(network_name + '.gexf'))
+	iflogger.info('Saving thresholded graph as {out}'.format(out=op.abspath(network_name + '.gexf')))
+	thresholded_array = nx.to_numpy_matrix(thresholded_ntwk)
+	thresholded_array = np.array(thresholded_array)
+	thresholded_dict = {}
+	thresholded_dict[network_name] = thresholded_array
+	sio.savemat(op.abspath(network_name + '.mat'), thresholded_dict)
+	iflogger.info('Saving thresholded graph as {out}'.format(out=op.abspath(network_name + '.mat')))
+	return network_name
+
+class ThresholdNetworkInputSpec(BaseInterfaceInputSpec):
+    in_file = File(exists=True, mandatory=True, desc='Network to filter')
+    above_threshold = traits.Bool(False, usedefault=True, desc='Only connectivity values greater than or equal to the threshold will be used')
+    weight_threshold = traits.Float(0.05, usedefault=True, desc='Connectivity weight threshold (default 0.05, for NBS graph analysis)')
+    edge_key = traits.Str('weight', usedefault=True, desc='Connectivity edge key to threshold')
+    out_gpickled_network = File(desc='Filtered network saved as a NetworkX .pck')
+    out_gexf_network = File(desc='Filtered network saved as a .gexf file')
+    out_matlab_network = File(desc='Filtered network saved as a .mat file')
+
+class ThresholdNetworkOutputSpec(TraitedSpec):
+    gpickled_network = File(desc='Thresholded network saved as a NetworkX .pck')
+    gexf_network = File(desc='Thresholded network saved as a .gexf file')
+    matlab_network = File(desc='Thresholded network saved as a MATLAB .mat file')
+
+class ThresholdNetwork(BaseInterface):
+	"""
+	Filters a graph's edges given a threshold value
+
+	Example
+	-------
+
+	>>> import nipype.interfaces.cmtk as cmtk
+	>>> thresh = cmtk.ThresholdNetwork()
+	>>> thresh.inputs.in_file = 'subj1.pck'
+	>>> thresh.run()                 # doctest: +SKIP
+
+	"""
+	input_spec = ThresholdNetworkInputSpec
+	output_spec = ThresholdNetworkOutputSpec
+
+	def _run_interface(self, runtime):	
+		network_name = threshold_edges(self.inputs.in_file, self.inputs.edge_key, self.inputs.weight_threshold, self.inputs.above_threshold)
+		return runtime
+
+	def _list_outputs(self):
+		outputs = self.output_spec().get()
+		_, name, _  = split_filename(self.inputs.in_file)
+
+		network_name = str(name) + '-thresholded'
+		
+		if not isdefined(self.inputs.out_gpickled_network):
+			outputs["gpickled_network"] = op.abspath(self._gen_outfilename(network_name, 'pck'))
+		else:
+			outputs["gpickled_network"] = op.abspath(self.inputs.out_gpickled_network)
+
+		if not isdefined(self.inputs.out_gexf_network):
+			outputs["gexf_network"] = op.abspath(self._gen_outfilename(network_name, 'gexf'))
+		else:
+			outputs["gexf_network"] = op.abspath(self.inputs.out_gexf_common_edges)
+
+		if not isdefined(self.inputs.out_matlab_network):
+			outputs["matlab_network"] = op.abspath(self._gen_outfilename(network_name, 'mat'))
+		else:
+			outputs["matlab_network"] = op.abspath(self.inputs.out_matlab_network)
+			
+		return outputs
+
+	def _gen_outfilename(self, name, ext):
+		return name + '.' + ext
