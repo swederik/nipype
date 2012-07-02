@@ -393,7 +393,7 @@ def difference_graph(in_file1, in_file2, ntwk_res_file, keep_only_common_edges=-
         # Calculate the difference for each key at all of the edges in network 1
         for edge in edges1:
             if ntwk2.has_edge(edge[0], edge[1]):
-                data = dict2
+                dict2 = ntwk2.has_edge(edge[0], edge[1])
                 dict1 = ntwk1.edge[edge[0]][edge[1]]
                 data = add_dicts_by_key(dict1, dict2, subtract=True)
                 diff_ntwk.add_edge(edge[0], edge[1], data)
