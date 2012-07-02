@@ -55,7 +55,7 @@ class NormalizeTracks(CommandLine):
             return None
     def _gen_outfilename(self):
         _, name , _ = split_filename(self.inputs.in_file)
-        return name + '_normalized.tck'
+        return name + '_normalized'
 
 class GenerateUnitWarpFieldInputSpec(CommandLineInputSpec):
     in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,

@@ -50,24 +50,31 @@ def read_mrtrix_tracks(in_file, as_generator=True):
 	return header, streamlines
 
 def read_mrtrix_header(in_file):
-    fileobj = open(in_file,'r')
-    header = {}
-    iflogger.info('Reading header data...')
-    for line in fileobj:
-        if line == 'END\n':
-            iflogger.info('Reached the end of the header!')
-            break
-        elif ': ' in line:
-            line = line.replace('\n','')
-            line = line.replace("'","")
-            key  = line.split(': ')[0]
-            value = line.split(': ')[1]
-            header[key] = value
-            iflogger.info('...adding "{v}" to header for key "{k}"'.format(v=value,k=key))
-    fileobj.close()
-    header['count'] = int(header['count'].replace('\n',''))
-    header['offset'] = int(header['file'].replace('.',''))
-    return header
+	fileobj = open(in_file,'r')
+	header = {}
+	iflogger.info('Reading header data...')
+	for line in fileobj:
+		if line == 'END\n':
+			iflogger.info('Reached the end of the header!')
+			break
+		elif ': ' in line:
+			line = line.replace('\n','')
+			line = line.replace("'","")
+			key  = line.split(': ')[0]
+			value = line.split(': ')[1]
+			if not header.has_key(key):
+				header[key] = value
+				iflogger.info('...adding "{v}" to header for key "{k}"'.format(v=value,k=key))
+	fileobj.close()
+	if not header['count'].rfind('\n') == -1:
+		header['count'] = int(header['count'].replace('\n',''))
+	else:
+		header['count'] = int(header['count'])
+	if not header['file'].rfind('.') == -1:
+		header['offset'] = int(header['file'].replace('.',''))
+	else:
+		header['offset'] = int(header['file'])
+	return header
 
 def read_mrtrix_streamlines(in_file, header, as_generator=True):
     offset = header['offset']
