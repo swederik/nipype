@@ -226,11 +226,12 @@ def create_track_normalization_pipeline(name="normtracks"):
     workflow.connect([(apply_deform, norm_tracks,[('out_files', 'transform_images')])])
     workflow.connect([(apply_deform, norm_tracks, [(('out_files', pull_prefix), 'transform_image_prefix')])])
 
-    output_fields = ["normalized_tracks"]
+    output_fields = ["normalized_tracks", "normalized_source"]
 
     outputnode = pe.Node(interface = util.IdentityInterface(fields=output_fields),
                                         name="outputnode")
     
     workflow.connect([(norm_tracks, outputnode, [("out_file", "normalized_tracks")])])
+    workflow.connect([(normalize_T1, outputnode, [("normalized_source", "normalized_source")])])
     
     return workflow
