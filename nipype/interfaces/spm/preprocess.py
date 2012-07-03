@@ -1053,6 +1053,7 @@ class ApplyDeformationFieldInputSpec(SPMCommandInputSpec):
     in_files = InputMultiPath(File(exists=True), mandatory=True, field='fnames')
     deformation_field = File(exists=True, mandatory=False, field='comp{1}.def' )
     inverse_sn2def_matname = File(exists=True, field='comp{1}.inv.comp{1}.sn2def.matname')
+    sn2def_matname = File(exists=True, field='comp{1}.sn2def.matname')
     inverse_volume = File(exists=True, field='comp{1}.inv.space')
     reference_volume = File(exists=True, mandatory=False, field='comp{2}.id.space')
     interp = traits.Range(low=0, high=7, field='interp',
@@ -1072,12 +1073,14 @@ class ApplyDeformations(SPMCommand):
         """Convert input to appropriate format for spm
         """
         
-        if opt in ['deformation_field', 'inverse_sn2def_matname', 'inverse_volume', 'reference_volume']:
+        if opt in ['deformation_field', 'inverse_sn2def_matname', 'sn2def_matname', 'inverse_volume', 'reference_volume']:
             return np.array([val], dtype=object)
             #return scans_for_fnames(val, keep4d=True, separate_sessions=False)
         if opt in ['in_files']:
-            return np.array([val[0] + ",1", val[1] + ",1", val[2] + ",1"], dtype=object)
-
+            in_list = []
+            for value in val:
+                in_list.append(value + ",1")
+            return np.array(in_list, dtype=object)
         else:
             return super(ApplyDeformations, self)._format_arg(opt, spec, val)
 
