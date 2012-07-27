@@ -286,6 +286,9 @@ def compute_singlevalued_measures(ntwk, weighted=True, calculate_cliques=False):
     measures['number_of_nodes'] = nx.number_of_nodes(ntwk)
     iflogger.info('...Computing average clustering...')
     measures['average_clustering'] = nx.average_clustering(ntwk)
+    iflogger.info('...Computing wiring cost...')
+    measures['cost'] = nx.cost(ntwk)
+    measures['cost_min1'], measures['cost_min1_numfiltered'] = nx.cost(ntwk, minimum_weight=1.1)
     if nx.is_connected(ntwk):
         iflogger.info('...Calculating average shortest path length...')
         measures['average_shortest_path_length'] = nx.average_shortest_path_length(ntwk, weighted)
