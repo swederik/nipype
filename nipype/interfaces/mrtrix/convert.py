@@ -56,10 +56,14 @@ def read_mrtrix_header(in_file):
             line = line.replace("'","")
             key  = line.split(': ')[0]
             value = line.split(': ')[1]
-            header[key] = value
-            iflogger.info('...adding "{v}" to header for key "{k}"'.format(v=value,k=key))
+            if not header.has_key(key):
+				header[key] = value
+				iflogger.info('...adding "{v}" to header for key "{k}"'.format(v=value,k=key))
     fileobj.close()
-    header['count'] = int(header['count'].replace('\n',''))
+    try:
+		header['count'] = int(header['count'].replace('\n',''))
+    except ValueError:
+		iflogger.info('No backslash n in "count" entry of header. Maybe the tracks have been warped.')
     header['offset'] = int(header['file'].replace('.',''))
     return header
 
