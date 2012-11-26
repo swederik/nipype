@@ -929,11 +929,11 @@ def nifti_to_tiff_stack(in_file):
     return out_file
 
 class Nifti2TiffStackInputSpec(BaseInterfaceInputSpec):
-    in_file = File(exists=True, mandatory=True, desc='Network to be converted')
-    out_file = File(desc='Difference network saved as a .mat file')
+    in_file = File(exists=True, mandatory=True, desc='Volume to be converted. Can be .nii or .nii.gz')
+    out_file = File(desc='Output volume as a stack of TIFF images')
 
 class Nifti2TiffStackOutputSpec(TraitedSpec):
-    out_file = File(desc="Nifti image for the input network's connectivity matrix")
+    out_file = File(desc="Output volume as a stack of TIFF images")
 
 class Nifti2TiffStack(BaseInterface):
 	"""
