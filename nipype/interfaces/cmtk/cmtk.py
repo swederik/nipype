@@ -415,18 +415,10 @@ class CreateMatrixOutputSpec(TraitedSpec):
     endpoint_file_mm = File(desc='Saved Numpy array with the endpoints of each fiber (in millimeters)', exists=True)
     fiber_length_file = File(desc='Saved Numpy array with the lengths of each fiber', exists=True)
     fiber_label_file = File(desc='Saved Numpy array with the labels for each fiber', exists=True)
-<<<<<<< HEAD
-    fiber_labels_noorphans = File(desc='Saved Numpy array with the labels for each non-orphan fiber', exists=True)
-    filtered_tractography = File(desc='TrackVis file containing only those fibers originate in one and terminate in another region', exists=True)
-    filtered_tractography_by_intersections = File(desc='TrackVis file containing all fibers which connect two regions', exists=True)
-    filtered_tractographies = OutputMultiPath(File(desc='TrackVis file containing only those fibers originate in one and terminate in another region', exists=True))
-    stats_file = File(desc='Saved Matlab .mat file with the number of fibers saved at each stage', exists=True)
-=======
     fiber_labels_noorphans = File(desc='Saved Numpy array with the labels for each non-orphan fiber')
     filtered_tractography = File(desc='TrackVis file containing only those fibers originate in one and terminate in another region')
     filtered_tractography_by_intersections = File(desc='TrackVis file containing all fibers which connect two regions')
     filtered_tractographies = OutputMultiPath(File(desc='TrackVis file containing only those fibers originate in one and terminate in another region'))
->>>>>>> Changes to allow for empty networks
 
 class CreateMatrix(BaseInterface):
     """
@@ -1218,8 +1210,4 @@ class TractsInImage(BaseInterface):
             filtered_tractography_by_intersections = op.abspath(name + '_filt_intersections.trk')
             outputs['filtered_tractography_by_intersections'] = filtered_tractography_by_intersections
             outputs['filtered_tractographies'] = [outputs['filtered_tractography'], outputs['filtered_tractography_by_intersections']]
-<<<<<<< HEAD
-        return outputs
-=======
-        return outputs
->>>>>>> Changes to allow for empty networks
+        return outputss
