@@ -623,3 +623,44 @@ class MRTransform(CommandLine):
     def _gen_outfilename(self):
         _, name , _ = split_filename(self.inputs.in_files[0])
         return name + '_MRTransform.mif'
+
+class CalculateTensorMetricInputSpec(CommandLineInputSpec):
+    in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,
+        desc='Diffusion tensor image')
+    out_filename = File(genfile=True, argstr='%s', position=-1, desc='Output Fractional Anisotropy filename')
+    quiet = traits.Bool(argstr='-quiet', position=1, desc="Do not display information messages or progress status.")
+    debug = traits.Bool(argstr='-debug', position=1, desc="Display debugging messages.")
+
+class CalculateTensorMetricOutputSpec(TraitedSpec):
+    metric = File(exists=True, desc='the output image of the major eigenvectors of the diffusion tensor image.')
+
+class CalculateTensorMetric(CommandLine):
+    """
+    Generates a map of the apparent diffusion coefficient (ADC) in each voxel
+
+    Example
+    -------
+
+    >>> import nipype.interfaces.mrtrix as mrt
+    >>> tensor2metric = mrt.CalculateTensorMetric()
+    >>> tensor2metric.inputs.in_file = 'dwi_tensor.mif'
+    >>> tensor2metric.run()                                # doctest: +SKIP
+    """
+
+    _cmd = 'tensor_metric'
+    input_spec=CalculateTensorMetricInputSpec
+    output_spec=CalculateTensorMetricOutputSpec
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        outputs['metric'] = op.abspath(self._gen_outfilename())
+        return outputs
+
+    def _gen_filename(self, name):
+        if name is 'out_filename':
+            return self._gen_outfilename()
+        else:
+            return None
+    def _gen_outfilename(self):
+        _, name , _ = split_filename(self.inputs.in_file)
+        return name + '_metric.mif'
