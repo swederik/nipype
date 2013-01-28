@@ -17,6 +17,7 @@ import warnings
 
 from ... import logging
 iflogger = logging.getLogger('interface')
+import dipy.reconst.dti as dti
 
 have_dipy = True
 try:

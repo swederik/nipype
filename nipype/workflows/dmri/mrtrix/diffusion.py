@@ -111,6 +111,11 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
                            (dwi2tensor, tensor2fa,[['tensor','in_file']]),
                           ])
 
+    workflow.connect([(inputnode, tensor_mode, [("bvecs", "bvecs"),
+                                                    ("bvals", "bvals")])])
+    workflow.connect([(inputnode, tensor_mode,[("dwi","in_file")])])
+
+
     workflow.connect([(inputnode, MRconvert,[("dwi","in_file")])])
     workflow.connect([(MRconvert, threshold_b0,[("converted","in_file")])])
     workflow.connect([(threshold_b0, median3d,[("out_file","in_file")])])
@@ -156,6 +161,9 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
     workflow.connect([(CSDstreamtrack, outputnode, [("tracked", "tracts_tck")]),
                       (csdeconv, outputnode, [("spherical_harmonics_image", "csdeconv")]),
                       (tensor2fa, outputnode, [("FA", "fa")]),
+                      (tensor_mode, outputnode, [("out_file", "fa")]),
+                      (tck2trk, outputnode, [("out_file", "tracts_trk")])
+
                       (tck2trk, outputnode, [("out_file", "tracts_trk")])
                       ])
     if tractography_type == 'probabilistic':
