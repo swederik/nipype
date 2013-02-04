@@ -222,6 +222,7 @@ def create_track_normalization_pipeline(name="normtracks"):
     newsegment_T1.inputs.channel_info = (2, 60, (True, True))
 
     reslice_fa = pe.Node(interface=fs.MRIConvert(), name='reslice_fa')
+    reslice_fa.inputs.out_type = 'nii'
 
     deform_fa = pe.Node(interface=spm.ApplyDeformations(), name='deform_fa')
     warp_MNI_to_T1 = pe.Node(interface=spm.ApplyDeformations(), name='warp_MNI_to_T1')
