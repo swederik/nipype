@@ -125,6 +125,8 @@ class RegionalValues(BaseInterface):
                         iflogger.error(key)
                         iflogger.error(np.shape(per_file_stats[key]))
                         iflogger.error("Double-check the subjects' freesurfer directory.")
+                        import ipdb
+                        ipdb.set_trace()
                         raise Exception("There may not be enough regions in the segmentation file!")
                         
                     name = '{k}_{i}'.format(k=key,i=str(in_file_idx))

@@ -240,6 +240,7 @@ def create_fmri_graphs(name="functional", with_simple_timecourse_correlation=Fal
     connectivity_threshold = pe.Node(interface=cmtk.CreateConnectivityThreshold(), name='connectivity_threshold')
     connectivity_graph = pe.MapNode(interface=cmtk.ConnectivityGraph(), name='connectivity_graph', iterfield=['in_file', 'component_index'])
     neuronal_regional_timecourses = pe.Node(interface=cmtk.RegionalValues(), name="neuronal_regional_timecourses")
+    simple_regional_timecourses = pe.Node(interface=cmtk.RegionalValues(), name="simple_regional_timecourses")
 
     # Define the CFF Converter, NetworkX MATLAB -> CommaSeparatedValue nodes
     graphCFFConverter = pe.Node(interface=cmtk.CFFConverter(), name="graphCFFConverter")
@@ -350,7 +351,13 @@ def create_fmri_graphs(name="functional", with_simple_timecourse_correlation=Fal
     func_ntwk.connect([(split_neuronal, resample_neuronal,[('out_files', 'in_file')])])
     func_ntwk.connect([(inputnode_within, resample_neuronal,[('segmentation_file', 'reslice_like')])])
 
-    # Calculates the fmri timecourse
+    # Calculates the fmri timecourse for the preprocessed fMRI signal
+    func_ntwk.connect([(inputnode_within, simple_regional_timecourses,[('segmentation_file', 'segmentation_file')])])
+    func_ntwk.connect([(createnodes, simple_regional_timecourses,[('node_network', 'resolution_network_file')])])
+    func_ntwk.connect([(resampleFunctional, simple_regional_timecourses,[('out_file', 'in_files')])])
+    simple_regional_timecourses.inputs.out_stats_file = 'fmri_timecourses.mat'
+
+    # Calculates the fmri timecourse for the denoised fMRI signal
     func_ntwk.connect([(inputnode_within, neuronal_regional_timecourses,[('segmentation_file', 'segmentation_file')])])
     func_ntwk.connect([(createnodes, neuronal_regional_timecourses,[('node_network', 'resolution_network_file')])])
     func_ntwk.connect([(resample_neuronal, neuronal_regional_timecourses,[('out_file', 'in_files')])])
@@ -437,7 +444,7 @@ def create_fmri_graphs(name="functional", with_simple_timecourse_correlation=Fal
         outputnode = pe.Node(interface = util.IdentityInterface(fields=["matching_stats", "neuronal_ntwks", "neuronal_cff", "neuronal_regional_timecourse_stats", "correlation_ntwks", "correlation_cff",
         "anticorrelation_ntwks", "anticorrelation_cff", "correlation_stats", "anticorrelation_stats", "simple_correlation_ntwks", "simple_correlation_cff"]), name="outputnode")
     else:
-        outputnode = pe.Node(interface = util.IdentityInterface(fields=["matching_stats", "neuronal_ntwks", "neuronal_cff", "neuronal_regional_timecourse_stats", "correlation_ntwks", "correlation_cff",
+        outputnode = pe.Node(interface = util.IdentityInterface(fields=["matching_stats", "neuronal_ntwks", "neuronal_cff", "simple_regional_timecourse_stats", "neuronal_regional_timecourse_stats", "correlation_ntwks", "correlation_cff",
         "correlation_stats", "anticorrelation_stats", "anticorrelation_ntwks", "anticorrelation_cff"]), name="outputnode")
 
     functional = pe.Workflow(name=name)
@@ -456,6 +463,8 @@ def create_fmri_graphs(name="functional", with_simple_timecourse_correlation=Fal
     functional.connect([(func_ntwk, outputnode,[('grouped_graphs.out_files', 'neuronal_ntwks')])])
     functional.connect([(func_ntwk, outputnode,[('neuronalCFFConverter.connectome_file', 'neuronal_cff')])])
     functional.connect([(func_ntwk, outputnode,[('neuronal_regional_timecourses.stats_file', 'neuronal_regional_timecourse_stats')])])
+    
+    functional.connect([(func_ntwk, outputnode,[('simple_regional_timecourses.stats_file', 'simple_regional_timecourse_stats')])])
 
     functional.connect([(func_ntwk, outputnode,[('remove_unconnected_corr.out_files', 'correlation_ntwks')])])
     functional.connect([(func_ntwk, outputnode,[('correlationCFFConverter.connectome_file', 'correlation_cff')])])

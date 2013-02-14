@@ -306,6 +306,7 @@ def compute_network_measures(ntwk):
 
 
 def add_node_data(node_array, ntwk):
+    ntwk = nx.read_gpickle(ntwk)
     node_ntwk = nx.Graph()
     newdata = {}
     for idx, data in ntwk.nodes_iter(data=True):
@@ -317,6 +318,7 @@ def add_node_data(node_array, ntwk):
 
 
 def add_edge_data(edge_array, ntwk, above=0, below=0):
+    ntwk = nx.read_gpickle(ntwk)
     edge_ntwk = ntwk.copy()
     data = {}
     for x, row in enumerate(edge_array):
