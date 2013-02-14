@@ -170,3 +170,123 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
         workflow.connect([(tracks2prob, outputnode, [("tract_image", "tdi")])])
 
     return workflow
+<<<<<<< HEAD
+=======
+
+
+def create_track_normalization_pipeline(name="normtracks"):
+    """Creates a pipeline to normalize a set of tracks from a subject's
+    diffusion space into a user-specified template space.
+
+    Example
+    -------
+
+    >>> norm = create_track_normalization_pipeline("normtracks")
+    >>> norm.inputs.inputnode.tracks = 'tracks.tck'
+    >>> norm.inputs.inputnode.fa = 'fa.nii'
+    >>> norm.inputs.inputnode.structural = 'struct.nii'
+    >>> norm.inputs.inputnode.template = 't1.nii'
+    >>> norm.run()                  # doctest: +SKIP
+
+    Inputs::
+
+        inputnode.tracks
+        inputnode.fa
+        inputnode.structural
+        inputnode.template
+
+    Outputs::
+
+        outputnode.normalized_tracks
+
+    """
+
+    inputnode = pe.Node(interface = util.IdentityInterface(fields=["tracks",   
+                                                                   "fa",
+                                                                   "structural"]),
+                        name="inputnode")
+
+    def pull_prefix(in_files):
+        from nipype.utils.filemanip import split_filename
+        path, name, ext = split_filename(in_files[0])
+        fixnaming = name[0:-2]
+        return fixnaming
+
+    gen_unit_warpfield_in_MNI = pe.Node(interface=mrtrix.GenerateUnitWarpField(), name='gen_unit_warpfield_in_MNI')
+    #gen_unit_warp.inputs.in_file = '/path/to/spm8/toolbox/Seg/TPM.nii'
+
+    norm_tracks = pe.Node(interface=mrtrix.NormalizeTracks(), name='norm_tracks')
+
+    newsegment_T1 = pe.Node(interface=spm.NewSegment(), name='newsegment_T1')
+    newsegment_T1.inputs.write_deformation_fields = [True, True]
+    newsegment_T1.inputs.channel_info = (2, 60, (True, True))
+
+    reslice_fa = pe.Node(interface=fs.MRIConvert(), name='reslice_fa')
+    reslice_fa.inputs.out_type = 'nii'
+
+    deform_fa = pe.Node(interface=spm.ApplyDeformations(), name='deform_fa')
+    warp_MNI_to_T1 = pe.Node(interface=spm.ApplyDeformations(), name='warp_MNI_to_T1')
+    warp_T1_to_FA = pe.Node(interface=spm.ApplyDeformations(), name='warp_T1_to_FA')
+
+    extract_brain_from_T1 = pe.Node(interface=fsl.BET(), name='extract_brain_from_T1')
+    extract_brain_from_T1.inputs.output_type = 'NIFTI'
+
+    apply_deform_to_T1 = pe.Node(interface=spm.ApplyDeformations(), name='apply_deform_to_T1')
+    applyxfm_T1_to_FA = pe.Node(interface=fsl.ApplyXfm(), name='applyxfm_T1_to_FA')
+    applyxfm_T1_to_FA.inputs.apply_xfm = True
+    applyxfm_T1_to_FA.inputs.no_resample = True
+    applyxfm_T1_to_FA.inputs.output_type = 'NIFTI'
+
+    invert_xfm = pe.Node(interface=fsl.ConvertXFM(), name='invert_xfm')
+    invert_xfm.inputs.invert_xfm = True
+
+    coreg_struct_fa = pe.Node(interface=fsl.FLIRT(), name='coreg_struct_fa')
+    coreg_struct_fa.inputs.cost = 'normmi'
+    coreg_struct_fa.inputs.dof = 12
+    coreg_struct_fa.inputs.output_type = 'NIFTI'
+    output_fields = ["normalized_tracks", "normalized_structural", "normalized_class_images", 
+                    "normalized_FA", "dwi_to_struct_mat", "T1_in_dwi_space", "bias_corrected", "transform_images", "forward_deformation_field"]
+
+    outputnode = pe.Node(interface = util.IdentityInterface(fields=output_fields),
+                                        name="outputnode")
+
+    workflow = pe.Workflow(name=name)
+    workflow.base_output_dir=name
+
+    workflow.connect([(inputnode, norm_tracks,[("tracks","in_file")])])
+    workflow.connect([(inputnode, reslice_fa,[("fa","in_file")])])
+    workflow.connect([(inputnode, reslice_fa,[("structural","reslice_like")])])
+    workflow.connect([(inputnode, extract_brain_from_T1,[("structural","in_file")])])
+    workflow.connect([(extract_brain_from_T1, coreg_struct_fa,[("out_file","reference")])])
+    workflow.connect([(reslice_fa, coreg_struct_fa,[("out_file","in_file")])])
+    workflow.connect([(coreg_struct_fa, outputnode,[("out_matrix_file","dwi_to_struct_mat")])])
+    workflow.connect([(coreg_struct_fa, outputnode,[("out_file","T1_in_dwi_space")])])
+
+    workflow.connect([(coreg_struct_fa, invert_xfm,[('out_matrix_file', 'in_file')])])
+    workflow.connect([(invert_xfm, applyxfm_T1_to_FA,[('out_file', 'in_matrix_file')])])
+    workflow.connect([(reslice_fa, applyxfm_T1_to_FA,[("out_file","reference")])])
+    workflow.connect([(inputnode, applyxfm_T1_to_FA,[("structural","in_file")])])
+
+    workflow.connect([(applyxfm_T1_to_FA, newsegment_T1,[("out_file","channel_files")])])
+
+    workflow.connect([(inputnode, deform_fa,[("fa","in_files")])])
+    workflow.connect([(newsegment_T1, deform_fa,[("forward_deformation_field","deformation_field")])])
+    workflow.connect([(apply_deform_to_T1, deform_fa,[("out_files","reference_volume")])])
+    workflow.connect([(deform_fa, outputnode,[("out_files","normalized_FA")])])
+
+    workflow.connect([(gen_unit_warpfield_in_MNI, warp_MNI_to_T1,[('out_files', 'in_files')])])
+    workflow.connect([(newsegment_T1, warp_MNI_to_T1,[("bias_corrected_images","inverse_volume")])])
+    workflow.connect([(newsegment_T1, warp_MNI_to_T1,[('forward_deformation_field', 'inverse_deformation_field')])])
+    workflow.connect([(warp_MNI_to_T1, norm_tracks,[('out_files', 'transform_images')])])
+    workflow.connect([(warp_MNI_to_T1, norm_tracks, [(('out_files', pull_prefix), 'transform_image_prefix')])])
+
+    workflow.connect([(norm_tracks, outputnode, [("out_file", "normalized_tracks")])])
+    workflow.connect([(newsegment_T1, outputnode, [("normalized_class_images", "normalized_class_images")])])
+    workflow.connect([(newsegment_T1, outputnode, [("forward_deformation_field", "forward_deformation_field")])])
+    workflow.connect([(newsegment_T1, outputnode, [("bias_corrected_images", "bias_corrected")])])
+
+    workflow.connect([(newsegment_T1, apply_deform_to_T1, [("forward_deformation_field", "deformation_field")])])
+    workflow.connect([(newsegment_T1, apply_deform_to_T1, [("bias_corrected_images", "in_files")])])
+    workflow.connect([(apply_deform_to_T1, outputnode, [("out_files", "normalized_structural")])])
+    return workflow
+>>>>>>> Updates Tracks2prob

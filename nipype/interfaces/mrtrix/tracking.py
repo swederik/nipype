@@ -22,6 +22,15 @@ class Tracks2ProbInputSpec(CommandLineInputSpec):
     voxel_dims = traits.List(traits.Float, argstr='-vox %s', sep=',', position=2, minlen=3, maxlen=3,
         desc='Three comma-separated numbers giving the size of each voxel in mm.')
     colour = traits.Bool(argstr='-colour', position=3, desc="add colour to the output image according to the direction of the tracks.")
+    fraction = traits.Bool(argstr='-fraction', position=4, desc="produce an image of the fraction of fibres through each voxel (as a proportion of the total number in the file), rather than" \
+                "the count.")
+    totalcount = traits.Bool(argstr='-totalcount', position=5, desc="when using the -fraction option, compute fractions as" \
+                "proportion of total_count header entry rather than number of" \
+                "tracks in the file. This total_count corresponds to the total" \
+                "number of streamlines actually generated rather than those that" \
+                "were eventually selected.")
+    length_scaled = traits.Bool(argstr='-lstdi', position=6, desc="scale the contribution of each track to the density image by the inverse of the streamline length")
+    debug = traits.Bool(argstr='-debug', position=7, desc="Turns on verbose mode for debugging")
     fraction = traits.Bool(argstr='-fraction', position=3, desc="produce an image of the fraction of fibres through each voxel (as a proportion of the total number in the file), rather than the count.")
     output_datatype = traits.Enum("Bit","Int8", "UInt8","Int16", "UInt16","Int32", "UInt32", "float32", "float64", argstr='-datatype %s', position=2,
                            desc='"i.e. Bfloat". Can be "char", "short", "int", "long", "float" or "double"') #, usedefault=True)
