@@ -228,6 +228,9 @@ def create_track_normalization_pipeline(name="normtracks"):
     warp_MNI_to_T1 = pe.Node(interface=spm.ApplyDeformations(), name='warp_MNI_to_T1')
     warp_T1_to_FA = pe.Node(interface=spm.ApplyDeformations(), name='warp_T1_to_FA')
 
+    extract_brain_from_T1 = pe.Node(interface=fsl.BET(), name='extract_brain_from_T1')
+    extract_brain_from_T1.inputs.output_type = 'NIFTI'
+
     apply_deform_to_T1 = pe.Node(interface=spm.ApplyDeformations(), name='apply_deform_to_T1')
     applyxfm_T1_to_FA = pe.Node(interface=fsl.ApplyXfm(), name='applyxfm_T1_to_FA')
     applyxfm_T1_to_FA.inputs.apply_xfm = True
@@ -239,10 +242,10 @@ def create_track_normalization_pipeline(name="normtracks"):
 
     coreg_struct_fa = pe.Node(interface=fsl.FLIRT(), name='coreg_struct_fa')
     coreg_struct_fa.inputs.cost = 'normmi'
-    coreg_struct_fa.inputs.dof = 6
+    coreg_struct_fa.inputs.dof = 12
     coreg_struct_fa.inputs.output_type = 'NIFTI'
     output_fields = ["normalized_tracks", "normalized_structural", "normalized_class_images", 
-                    "normalized_FA", "dwi_to_struct_mat", "bias_corrected", "transform_images", "forward_deformation_field"]
+                    "normalized_FA", "dwi_to_struct_mat", "T1_in_dwi_space", "bias_corrected", "transform_images", "forward_deformation_field"]
 
     outputnode = pe.Node(interface = util.IdentityInterface(fields=output_fields),
                                         name="outputnode")
@@ -253,9 +256,11 @@ def create_track_normalization_pipeline(name="normtracks"):
     workflow.connect([(inputnode, norm_tracks,[("tracks","in_file")])])
     workflow.connect([(inputnode, reslice_fa,[("fa","in_file")])])
     workflow.connect([(inputnode, reslice_fa,[("structural","reslice_like")])])
-    workflow.connect([(inputnode, coreg_struct_fa,[("structural","reference")])])
+    workflow.connect([(inputnode, extract_brain_from_T1,[("structural","in_file")])])
+    workflow.connect([(extract_brain_from_T1, coreg_struct_fa,[("out_file","reference")])])
     workflow.connect([(reslice_fa, coreg_struct_fa,[("out_file","in_file")])])
     workflow.connect([(coreg_struct_fa, outputnode,[("out_matrix_file","dwi_to_struct_mat")])])
+    workflow.connect([(coreg_struct_fa, outputnode,[("out_file","T1_in_dwi_space")])])
 
     workflow.connect([(coreg_struct_fa, invert_xfm,[('out_matrix_file', 'in_file')])])
     workflow.connect([(invert_xfm, applyxfm_T1_to_FA,[('out_file', 'in_matrix_file')])])
@@ -264,7 +269,7 @@ def create_track_normalization_pipeline(name="normtracks"):
 
     workflow.connect([(applyxfm_T1_to_FA, newsegment_T1,[("out_file","channel_files")])])
 
-    workflow.connect([(reslice_fa, deform_fa,[("out_file","in_files")])])
+    workflow.connect([(inputnode, deform_fa,[("fa","in_files")])])
     workflow.connect([(newsegment_T1, deform_fa,[("forward_deformation_field","deformation_field")])])
     workflow.connect([(apply_deform_to_T1, deform_fa,[("out_files","reference_volume")])])
     workflow.connect([(deform_fa, outputnode,[("out_files","normalized_FA")])])
