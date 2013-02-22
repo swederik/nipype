@@ -135,6 +135,7 @@ class RegionalValues(BaseInterface):
                     ntwks.append(out_file)
                 all_ntwks.extend(ntwks)
         else:
+            rois = get_roi_list(self.inputs.segmentation_file)
             roi_mean_tc, roi_max_tc, roi_min_tc, roi_std_tc, voxels = get_timecourse_by_region(in_files, self.inputs.segmentation_file, rois)
 
             stats = {}
