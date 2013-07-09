@@ -3,7 +3,7 @@ import nipype.pipeline.engine as pe          # pypeline engine
 import nipype.interfaces.fsl as fsl
 import nipype.interfaces.mrtrix as mrtrix
 
-def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilistic'):
+def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilistic', affine_reg = False):
     """Creates a pipeline that does the same diffusion processing as in the
     :doc:`../../users/examples/dmri_mrtrix_dti` example script. Given a diffusion-weighted image,
     b-values, and b-vectors, the workflow will return the tractography
@@ -34,10 +34,19 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
 
     """
 
-    inputnode = pe.Node(interface = util.IdentityInterface(fields=["dwi",
-                                                                   "bvecs",
-                                                                   "bvals"]),
-                        name="inputnode")
+    if affine_reg:
+        inputnode = pe.Node(interface = util.IdentityInterface(fields=["struct",
+                                                                       "dwi",
+                                                                       "bvecs",
+                                                                       "bvals"]),
+                            name="inputnode")
+        coregister = pe.Node(interface=fsl.FLIRT(dof=6), name = 'coregister')
+        coregister.inputs.cost = ('normmi')
+    else:
+        inputnode = pe.Node(interface = util.IdentityInterface(fields=["dwi",
+                                                                       "bvecs",
+                                                                       "bvals"]),
+                            name="inputnode")
 
     bet = pe.Node(interface=fsl.BET(), name="bet")
     bet.inputs.mask = True
@@ -144,8 +153,15 @@ def create_mrtrix_dti_pipeline(name="dtiproc", tractography_type = 'probabilisti
         workflow.connect([(CSDstreamtrack, tracks2prob,[("tracked","in_file")])])
         workflow.connect([(inputnode, tracks2prob,[("dwi","template_file")])])
 
+    if affine_reg:
+        workflow.connect([(inputnode, coregister,[("dwi","in_file")])])
+        workflow.connect([(inputnode, coregister,[('struct','reference')])])
+        workflow.connect([(inputnode, tck2trk,[("struct","image_file")])])
+        workflow.connect([(coregister, tck2trk,[("out_matrix_file","matrix_file")])])
+    else:
+        workflow.connect([(inputnode, tck2trk,[("dwi","image_file")])])
+
     workflow.connect([(CSDstreamtrack, tck2trk,[("tracked","in_file")])])
-    workflow.connect([(inputnode, tck2trk,[("dwi","image_file")])])
 
     output_fields = ["fa", "tracts_trk", "csdeconv", "tracts_tck"]
     if tractography_type == 'probabilistic':
