@@ -14,6 +14,55 @@ from nipype.utils.filemanip import split_filename
 import os, os.path as op
 from nipype.interfaces.traits_extension import isdefined
 
+
+class FilterTracksInputSpec(CommandLineInputSpec):
+    in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,
+        desc='tract file')
+    include_mask_image = File(exists=True, argstr='-include %s', xor=["include_ROI_xyzr"],
+        desc='specify an inclusion region of interest. Tracks that enter ALL such inclusion ROI will be included.')
+    include_ROI_xyzr = traits.List(traits.Float, argstr='-include %s', xor=["include_mask_image"], 
+        sep=',', minlen=4, maxlen=4,
+        desc='specify an inclusion region of interest. Tracks that enter ALL such inclusion ROI will be included.' \
+          'comma-separated list of 4 floating-point values,' \
+          'specifying the [x,y,z] coordinates of the centre and radius of a spherical ROI.')
+
+    exclude_mask_image = File(exists=True, argstr='-exclude %s', xor=["exclude_ROI_xyzr"],
+        desc='exclusion region of interest. Tracks that enter ANY such exclusion ROI will NOT be included.')
+    exclude_ROI_xyzr = File(exists=True, argstr='-exclude %s', xor=["exclude_mask_image"], 
+        sep=',', minlen=4, maxlen=4,
+        desc='exclusion region of interest. Tracks that enter ANY such exclusion ROI will NOT be included.' \
+          'comma-separated list of 4 floating-point values,' \
+          'specifying the [x,y,z] coordinates of the centre and radius of a spherical ROI.')
+    minimum_track_length = traits.Float(argstr='-minlength %s',
+        desc='the minimum length of a track. Tracks shorter than this value will NOT be included. (mm)')
+    invert_matching = traits.Bool(argstr='-invert', desc="invert the matching process, so that tracks that would otherwise have been included are now excluded and vice-versa.")
+    no_mask_interpolation = traits.Bool(argstr='-nomaskinterp', desc="do NOT perform tri-linear interpolation of mask images.")
+    out_filename = File(genfile=True, argstr='%s', position= -1, desc='output data file')
+
+class FilterTracksOutputSpec(TraitedSpec):
+    tracks = File(exists=True, desc='Output tracks')
+
+class FilterTracks(CommandLine):
+
+    _cmd = 'filter_tracks'
+    input_spec=FilterTracksInputSpec
+    output_spec=FilterTracksOutputSpec
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        outputs['tracks'] = op.abspath(self._gen_outfilename())
+        return outputs
+
+    def _gen_filename(self, name):
+        if name is 'out_filename':
+            return self._gen_outfilename()
+        else:
+            return None
+    def _gen_outfilename(self):
+        _, name , _ = split_filename(self.inputs.tracks)
+        return name + '_filt.tck'
+
+
 class Tracks2ProbInputSpec(CommandLineInputSpec):
     in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,
         desc='tract file')
@@ -78,7 +127,7 @@ class Tracks2Prob(CommandLine):
             return None
     def _gen_outfilename(self):
         _, name , _ = split_filename(self.inputs.in_file)
-        return name + '_TDI.mif'
+        return name + '_TDI.nii'
 
 class StreamlineTrackInputSpec(CommandLineInputSpec):
     in_file = File(exists=True, argstr='%s', mandatory=True, position=-2, desc='the image containing the source data.' \

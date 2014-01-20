@@ -3,7 +3,8 @@
 from .tracking import (Tracks2Prob, StreamlineTrack,
                        DiffusionTensorStreamlineTrack,
                        SphericallyDeconvolutedStreamlineTrack,
-                       ProbabilisticSphericallyDeconvolutedStreamlineTrack)
+                       ProbabilisticSphericallyDeconvolutedStreamlineTrack,
+                       FilterTracks)
 from .tensors import (FSL2MRTrix, ConstrainedSphericalDeconvolution,
                       DWI2SphericalHarmonicsImage, EstimateResponseForSH,
                       GenerateDirections, FindShPeaks, Directions2Amplitude)
