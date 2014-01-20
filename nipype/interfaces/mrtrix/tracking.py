@@ -12,6 +12,7 @@
 from nipype.interfaces.base import CommandLineInputSpec, CommandLine, traits, TraitedSpec, File
 from nipype.utils.filemanip import split_filename
 import os, os.path as op
+from nipype.interfaces.traits_extension import isdefined
 
 class Tracks2ProbInputSpec(CommandLineInputSpec):
     in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,
@@ -31,7 +32,7 @@ class Tracks2ProbInputSpec(CommandLineInputSpec):
     length_scaled = traits.Bool(argstr='-lstdi', position=6, desc="scale the contribution of each track to the density image by the inverse of the streamline length")
     debug = traits.Bool(argstr='-debug', position=7, desc="Turns on verbose mode for debugging")
     fraction = traits.Bool(argstr='-fraction', position=3, desc="produce an image of the fraction of fibres through each voxel (as a proportion of the total number in the file), rather than the count.")
-    output_datatype = traits.Enum("nii", "float", "char", "short", "int", "long", "double", argstr='-datatype %s', position=2,
+    output_datatype = traits.Enum("Bit","Int8", "UInt8","Int16", "UInt16","Int32", "UInt32", "float32", "float64", argstr='-datatype %s', position=2,
                            desc='"i.e. Bfloat". Can be "char", "short", "int", "long", "float" or "double"') #, usedefault=True)
     resample = traits.Float(argstr='-resample %d', position=3,
         units='mm', desc='resample the tracks at regular intervals using Hermite interpolation. If omitted, the program will select an appropriate interpolation factor automatically.')
@@ -63,7 +64,11 @@ class Tracks2Prob(CommandLine):
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
-        outputs['tract_image'] = op.abspath(self._gen_outfilename())
+        outputs['tract_image'] = self.inputs.out_filename
+        if not isdefined(outputs['tract_image']):
+            outputs['tract_image'] = op.abspath(self._gen_outfilename())
+        else:
+            outputs['tract_image'] = os.path.abspath(outputs['tract_image'])
         return outputs
 
     def _gen_filename(self, name):
@@ -80,18 +85,18 @@ class StreamlineTrackInputSpec(CommandLineInputSpec):
     'The type of data required depends on the type of tracking as set in the preceeding argument. For DT methods, ' \
     'the base DWI are needed. For SD methods, the SH harmonic coefficients of the FOD are needed.')
 
-    seed_file = File(exists=True, argstr='-seed %s', mandatory=False, position=2, desc='seed file')
-    seed_spec = traits.List(traits.Int, desc='seed specification in voxels and radius (x y z r)', position=2,
-        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='voxels')
-    include_file = File(exists=True, argstr='-include %s', mandatory=False, position=2, desc='inclusion file')
-    include_spec = traits.List(traits.Int, desc='inclusion specification in voxels and radius (x y z r)', position=2,
-        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='voxels')
-    exclude_file = File(exists=True, argstr='-exclude %s', mandatory=False, position=2, desc='exclusion file')
-    exclude_spec = traits.List(traits.Int, desc='exclusion specification in voxels and radius (x y z r)', position=2,
-        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='voxels')
-    mask_file = File(exists=True, argstr='-exclude %s', mandatory=False, position=2, desc='mask file. Only tracks within mask.')
-    mask_spec = traits.List(traits.Int, desc='Mask specification in voxels and radius (x y z r). Tracks will be terminated when they leave the ROI.', position=2,
-        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='voxels')
+    seed_file = File(exists=True, argstr='-seed %s', position=2, desc='seed file')
+    seed_spec = traits.List(traits.Float, desc='seed specification in mm and radius (x y z r)', position=2,
+        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='mm')
+    include_file = File(exists=True, argstr='-include %s', position=2, desc='inclusion file')
+    include_spec = traits.List(traits.Float, desc='inclusion specification in mm and radius (x y z r)', position=2,
+        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='mm')
+    exclude_file = File(exists=True, argstr='-exclude %s', position=2, desc='exclusion file')
+    exclude_spec = traits.List(traits.Float, desc='exclusion specification in mm and radius (x y z r)', position=2,
+        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='mm')
+    mask_file = File(exists=True, argstr='-exclude %s', position=2, desc='mask file. Only tracks within mask.')
+    mask_spec = traits.List(traits.Float, desc='Mask specification in mm and radius (x y z r). Tracks will be terminated when they leave the ROI.', position=2,
+        argstr='-seed %s', minlen=4, maxlen=4, sep=',', units='mm')
 
     inputmodel = traits.Enum('DT_STREAM', 'SD_PROB', 'SD_STREAM',
         argstr='%s', desc='input model type', usedefault=True, position=-3)
@@ -163,7 +168,7 @@ class StreamlineTrack(CommandLine):
 
     def _gen_outfilename(self):
         _, name , _ = split_filename(self.inputs.in_file)
-        return name + '_tracked'
+        return name + '_tracked.tck'
 
 class DiffusionTensorStreamlineTrackInputSpec(StreamlineTrackInputSpec):
     gradient_encoding_file = File(exists=True, argstr='-grad %s', mandatory=True, position=-2,
@@ -192,7 +197,7 @@ class DiffusionTensorStreamlineTrack(StreamlineTrack):
         return super(DiffusionTensorStreamlineTrack, self).__init__(command, **inputs)
 
 class ProbabilisticSphericallyDeconvolutedStreamlineTrackInputSpec(StreamlineTrackInputSpec):
-    maximum_number_of_trials = traits.Int(argstr='-trials %s', units='mm',
+    maximum_number_of_trials = traits.Int(argstr='-trials %s',
         desc="Set the maximum number of sampling trials at each point (only used for probabilistic tracking).")
 
 class ProbabilisticSphericallyDeconvolutedStreamlineTrack(StreamlineTrack):

@@ -9,17 +9,15 @@
 
 """
 
-from nipype.interfaces.base import InputMultiPath, CommandLineInputSpec, CommandLine, traits, TraitedSpec, File
+from nipype.interfaces.base import CommandLineInputSpec, CommandLine, traits, TraitedSpec, File
 from nipype.utils.filemanip import split_filename
 import os, os.path as op
   
 class NormalizeTracksInputSpec(CommandLineInputSpec):
-    in_file = File(exists=True, argstr='%s', mandatory=True, position=1,
+    in_file = File(exists=True, argstr='%s', mandatory=True, position=-3,
         desc='the input MRtrix (.tck) track file')
-    transform_images = InputMultiPath(File(exists=True), copyfile=True, mandatory=True,
-        desc='the images containing the transform.')
-    transform_image_prefix = traits.Str(mandatory=True, argstr = '%s-[]',
-        desc='the images containing the transform.')
+    transform_image = File(exists=True, argstr='%s', mandatory=True, position=-2,
+        desc='the image containing the transform.')        
     out_filename = File(genfile=True, argstr='%s', position=-1, desc='Output normalized track file name')
     quiet = traits.Bool(argstr='-quiet', position=1, desc="Do not display information messages or progress status.")
     debug = traits.Bool(argstr='-debug', position=1, desc="Display debugging messages.")
@@ -62,12 +60,13 @@ class NormalizeTracks(CommandLine):
 class GenerateUnitWarpFieldInputSpec(CommandLineInputSpec):
     in_file = File(exists=True, argstr='%s', mandatory=True, position=-2,
         desc='the input template image (.nii or .mif)')
-    out_filename = File(genfile=True, argstr='%s-[].nii', position=-1, desc='Output normalized track file name')
+    out_filename = File(genfile=True, argstr='%s', position=-1, desc='Output normalized track file name')
     quiet = traits.Bool(argstr='-quiet', position=1, desc="Do not display information messages or progress status.")
     debug = traits.Bool(argstr='-debug', position=1, desc="Display debugging messages.")
 
 class GenerateUnitWarpFieldOutputSpec(TraitedSpec):
-    out_files = InputMultiPath(File(exists=True), desc='the output normalized track file')
+    out_file = File(exists=True, desc='the output normalized track file')
+
 
 class GenerateUnitWarpField(CommandLine):
     """ Generates a warp field corresponding to a no-warp operation.
@@ -91,12 +90,7 @@ class GenerateUnitWarpField(CommandLine):
 
     def _list_outputs(self):
         outputs = self.output_spec().get()
-        _, name , _ = split_filename(self.inputs.in_file)
-        out_list = [op.abspath(name + '_warp-0.nii')]
-        out_list.append(op.abspath(name + '_warp-1.nii'))
-        out_list.append(op.abspath(name + '_warp-2.nii'))
-        
-        outputs['out_files'] = out_list
+        outputs['out_file'] = op.abspath(self._gen_outfilename())
         return outputs
 
     def _gen_filename(self, name):
@@ -106,4 +100,4 @@ class GenerateUnitWarpField(CommandLine):
             return None
     def _gen_outfilename(self):
         _, name , _ = split_filename(self.inputs.in_file)
-        return op.abspath(name + '_warp')
+        return name + '_warpfield.nii'

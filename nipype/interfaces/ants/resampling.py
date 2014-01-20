@@ -100,6 +100,12 @@ class WarpTimeSeriesImageMultiTransform(ANTSCommand):
                                                         ext)))
         return outputs
 
+    def _run_interface(self, runtime):
+        runtime = super(WarpTimeSeriesImageMultiTransform, self)._run_interface(runtime, correct_return_codes = [0,1])
+        if "100 % complete" not in runtime.stdout:
+            self.raise_exception(runtime)
+        return runtime
+
 
 class WarpImageMultiTransformInputSpec(ANTSCommandInputSpec):
     dimension = traits.Enum(3, 2, argstr='%d', usedefault=True,
@@ -202,16 +208,26 @@ class WarpImageMultiTransform(ANTSCommand):
 
 
 class ApplyTransformsInputSpec(ANTSCommandInputSpec):
-    dimension = traits.Enum(
-        3, 2, argstr='--dimensionality %d', usedefault=True,
-        desc='image dimension (2 or 3)')
+    dimension = traits.Enum(2, 3, 4, argstr='--dimensionality %d',
+                            desc=('This option forces the image to be treated '
+                                  'as a specified-dimensional image. If not '
+                                  'specified, antsWarp tries to infer the '
+                                  'dimensionality from the input image.'))
+    input_image_type = traits.Enum(0, 1, 2, 3,
+                                   argstr='--input-image-type %d',
+                                   desc=('Option specifying the input image '
+                                         'type of scalar (default), vector, '
+                                         'tensor, or time series.'))
     input_image = File(argstr='--input %s', mandatory=True,
                        desc=('image to apply transformation to (generally a '
                               'coregistered functional)'),
                        exists=True)
     output_image = traits.Str(argstr='--output %s',
                               desc=('output file name'), genfile=True,
-                              hash_file=False)
+                              hash_files=False)
+    out_postfix = traits.Str("_trans", usedefault=True,
+                             desc=('Postfix that is appended to all output '
+                                   'files (default = _trans)'))
     reference_image = File(argstr='--reference-image %s', mandatory=True,
                            desc='reference image space that you wish to warp INTO',
                            exists=True)
@@ -273,7 +289,7 @@ class ApplyTransforms(ANTSCommand):
             output = self.inputs.output_image
             if not isdefined(output):
                 _, name, ext = split_filename(self.inputs.input_image)
-                output = name + '_trans' + ext
+                output = name + self.inputs.out_postfix + ext
             return output
         return None
 

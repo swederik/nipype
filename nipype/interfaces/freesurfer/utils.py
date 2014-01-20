@@ -16,7 +16,7 @@ import re
 from nipype.utils.filemanip import fname_presuffix, split_filename
 
 from nipype.interfaces.freesurfer.base import FSCommand, FSTraitedSpec
-from nipype.interfaces.base import TraitedSpec, File, traits, OutputMultiPath, isdefined
+from nipype.interfaces.base import TraitedSpec, File, traits, OutputMultiPath, isdefined, CommandLine, CommandLineInputSpec
 
 filemap = dict(cor='cor', mgh='mgh', mgz='mgz', minc='mnc',
                afni='brik', brik='brik', bshort='bshort',
@@ -39,16 +39,16 @@ class SampleToSurfaceInputSpec(FSTraitedSpec):
 
     hemi = traits.Enum("lh", "rh", mandatory=True, argstr="--hemi %s",
                        desc="target hemisphere")
-    surface = traits.String(argstr="--surf", desc="target surface (default is white)")
+    surface = traits.String(argstr="--surf %s", desc="target surface (default is white)")
 
     reg_xors = ["reg_file", "reg_header", "mni152reg"]
-    reg_file = File(exists=True, argstr="--reg %s", required=True, xor=reg_xors,
+    reg_file = File(exists=True, argstr="--reg %s", mandatory=True, xor=reg_xors,
                     desc="source-to-reference registration file")
     reg_header = traits.Bool(argstr="--regheader %s", requires=["subject_id"],
-                             required=True, xor=reg_xors,
+                             mandatory=True, xor=reg_xors,
                              desc="register based on header geometry")
     mni152reg = traits.Bool(argstr="--mni152reg",
-                            required=True, xor=reg_xors,
+                            mandatory=True, xor=reg_xors,
                             desc="source volume is in MNI152 space")
 
     apply_rot = traits.Tuple(traits.Float, traits.Float, traits.Float,
@@ -200,7 +200,7 @@ class SampleToSurface(FSCommand):
 
     def _list_outputs(self):
         outputs = self._outputs().get()
-        outputs["out_file"] = self._get_outfilename()
+        outputs["out_file"] = os.path.abspath(self._get_outfilename())
         hitsfile = self.inputs.hits_file
         if isdefined(hitsfile):
             outputs["hits_file"] = hitsfile
@@ -296,24 +296,32 @@ class SurfaceSmooth(FSCommand):
 class SurfaceTransformInputSpec(FSTraitedSpec):
     source_file = File(exists=True, mandatory=True, argstr="--sval %s",
                        xor=['source_annot_file'],
-                       help="surface file with source values")
-    source_annot_file = File(exists=True, mandatory=True, argstr="--sval-annot %s",
+                       desc="surface file with source values")
+    source_annot_file = File(exists=True, mandatory=True,
+                             argstr="--sval-annot %s",
                              xor=['source_file'],
-                             help="surface annotation file")
+                             desc="surface annotation file")
     source_subject = traits.String(mandatory=True, argstr="--srcsubject %s",
-                                   help="subject id for source surface")
+                                   desc="subject id for source surface")
     hemi = traits.Enum("lh", "rh", argstr="--hemi %s", mandatory=True,
                        desc="hemisphere to transform")
     target_subject = traits.String(mandatory=True, argstr="--trgsubject %s",
-                                   help="subject id of target surface")
-    target_ico_order = traits.Enum(1, 2, 3, 4, 5, 6, 7, argstr="--trgicoorder %d",
-                                   help="order of the icosahedron if target_subject is 'ico'")
-    source_type = traits.Enum(filetypes, argstr='--sfmt %s', requires=['source_file'],
-                              help="source file format")
-    target_type = traits.Enum(filetypes, argstr='--tfmt %s', help="output format")
-    reshape = traits.Bool(argstr="--reshape", help="reshape output surface to conform with Nifti")
-    reshape_factor = traits.Int(argstr="--reshape-factor", help="number of slices in reshaped image")
-    out_file = File(argstr="--tval %s", genfile=True, desc="surface file to write")
+                                   desc="subject id of target surface")
+    target_ico_order = traits.Enum(1, 2, 3, 4, 5, 6, 7,
+                                   argstr="--trgicoorder %d",
+                                   desc=("order of the icosahedron if "
+                                         "target_subject is 'ico'"))
+    source_type = traits.Enum(filetypes, argstr='--sfmt %s',
+                              requires=['source_file'],
+                              desc="source file format")
+    target_type = traits.Enum(filetypes, argstr='--tfmt %s',
+                              desc="output format")
+    reshape = traits.Bool(argstr="--reshape",
+                          desc="reshape output surface to conform with Nifti")
+    reshape_factor = traits.Int(argstr="--reshape-factor",
+                                desc="number of slices in reshaped image")
+    out_file = File(argstr="--tval %s", genfile=True,
+                    desc="surface file to write")
 
 
 class SurfaceTransformOutputSpec(TraitedSpec):
@@ -373,6 +381,70 @@ class SurfaceTransform(FSCommand):
         if name == "out_file":
             return self._list_outputs()[name]
         return None
+
+
+class Surface2VolTransformInputSpec(FSTraitedSpec):
+    source_file = File(exists=True, argstr='--surfval %s',
+                      copyfile=False, mandatory=True,
+                      desc='This is the source of the surface values')
+    hemi = traits.Str(argstr='--hemi %s', mandatory=True,
+                      desc='hemisphere of data')
+    transformed_file = File(name_template="%s_asVol.nii", desc='Output volume',
+                            argstr='--outvol %s',
+                            name_source=['source_file'], hash_files=False)
+    reg_file = File(exists=True, argstr='--volreg %s',
+                    mandatory=True,
+                    desc='tkRAS-to-tkRAS matrix   (tkregister2 format)',
+                    xor=['subject_id'])
+    template_file = File(exists=True, argstr='--template %s',
+                      desc='Output template volume')
+    mkmask = traits.Bool(desc='make a mask instead of loading surface values',
+                         argstr='--mkmask')
+    vertexvol_file = File(name_template="%s_asVol_vertex.nii",
+                          desc=('Path name of the vertex output volume, which '
+                                'is the same as output volume except that the '
+                                'value of each voxel is the vertex-id that is '
+                                'mapped to that voxel.'),
+                          argstr='--vtxvol %s', name_source=['source_file'],
+                          hash_files=False)
+    surf_name = traits.Str(argstr='--surf %s',
+                           desc='surfname (default is white)')
+    projfrac = traits.Float(argstr='--projfrac %s', desc='thickness fraction')
+    subjects_dir = traits.Str(argstr='--sd %s',
+                              desc=('freesurfer subjects directory defaults to '
+                                    '$SUBJECTS_DIR'))
+    subject_id = traits.Str(argstr='--identity %s',desc='subject id',
+                            xor=['reg_file'])
+
+
+class Surface2VolTransformOutputSpec(TraitedSpec):
+    transformed_file = File(exists=True,
+                            desc='Path to output file if used normally')
+    vertexvol_file = File(desc='vertex map volume path id. Optional')
+
+
+class Surface2VolTransform(FSCommand):
+    """Use FreeSurfer mri_surf2vol to apply a transform.
+
+    Examples
+    --------
+
+    >>> from nipype.interfaces.freesurfer import Surface2VolTransform
+    >>> xfm2vol = Surface2VolTransform()
+    >>> xfm2vol.inputs.source_file = 'lh.cope1.mgz'
+    >>> xfm2vol.inputs.reg_file = 'register.mat'
+    >>> xfm2vol.inputs.hemi = 'lh'
+    >>> xfm2vol.inputs.template_file = 'cope1.nii.gz'
+    >>> xfm2vol.inputs.subjects_dir = '.'
+    >>> xfm2vol.cmdline
+    'mri_surf2vol --hemi lh --volreg register.mat --surfval lh.cope1.mgz --sd . --template cope1.nii.gz --outvol lh.cope1_asVol.nii --vtxvol lh.cope1_asVol_vertex.nii'
+    >>> res = xfm2vol.run()# doctest: +SKIP
+
+    """
+
+    _cmd = 'mri_surf2vol'
+    input_spec = Surface2VolTransformInputSpec
+    output_spec = Surface2VolTransformOutputSpec
 
 
 class ApplyMaskInputSpec(FSTraitedSpec):
@@ -974,7 +1046,7 @@ class SmoothTessellation(FSCommand):
         else:
             _, name, ext = split_filename(self.inputs.in_file)
             return os.path.abspath(name + '_smoothed' + ext)
-    
+
     def _run_interface(self, runtime):
         # The returncode is meaningless in BET.  So check the output
         # in stderr and if it's set, then update the returncode
@@ -1018,3 +1090,30 @@ class MakeAverageSubject(FSCommand):
         outputs = self.output_spec().get()
         outputs['average_subject_name'] = self.inputs.out_name
         return outputs
+
+class ExtractMainComponentInputSpec(CommandLineInputSpec):
+    in_file = File(exists=True, mandatory=True, argstr='%s', position=1,
+                   desc='input surface file')
+    out_file = File(name_template='%s.maincmp', name_source='in_file',
+                    argstr='%s', position=2,
+                    desc='surface containing main component')
+
+class ExtractMainComponentOutputSpec(TraitedSpec):
+    out_file = File(exists=True, desc='surface containing main component')
+
+class ExtractMainComponent(CommandLine):
+    """Extract the main component of a tesselated surface
+
+    Examples
+    --------
+
+    >>> from nipype.interfaces.freesurfer import ExtractMainComponent
+    >>> mcmp = ExtractMainComponent(in_file='lh.pial')
+    >>> mcmp.cmdline
+    'mris_extract_main_component lh.pial lh.maincmp'
+
+    """
+
+    _cmd='mris_extract_main_component'
+    input_spec=ExtractMainComponentInputSpec
+    output_spec=ExtractMainComponentOutputSpec
