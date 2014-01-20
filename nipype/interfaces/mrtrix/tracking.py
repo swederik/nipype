@@ -59,7 +59,7 @@ class FilterTracks(CommandLine):
         else:
             return None
     def _gen_outfilename(self):
-        _, name , _ = split_filename(self.inputs.tracks)
+        _, name , _ = split_filename(self.inputs.in_file)
         return name + '_filt.tck'
 
 
